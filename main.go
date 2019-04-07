@@ -66,31 +66,33 @@ func readInput(cli *client.Client) {
 		panic(err)
 	}
 	defer f.Close()
-
+	start := time.Now()
 	s := bufio.NewScanner(f)
 	for s.Scan() {
 		watt := parseWattLine(s.Bytes())
-		// Publish a message.
-		fmt.Printf("Publishing %sW %s°C\n", watt.Watts1, watt.TempC)
-		err = cli.Publish(&client.PublishOptions{
-			QoS:       mqtt.QoS0,
-			TopicName: []byte("home/power/global"),
-			Message:   []byte(watt.Watts1),
-		})
+		if watt.Watts1 != "" && time.Since(start).Seconds() > 60 {
+			// Publish a message.
+			fmt.Printf("Publishing %sW %s°C\n", watt.Watts1, watt.TempC)
+			start = time.Now()
+			err = cli.Publish(&client.PublishOptions{
+				QoS:       mqtt.QoS0,
+				TopicName: []byte("home/power/global"),
+				Message:   []byte(watt.Watts1),
+			})
 
-		if err != nil {
-			panic(err)
+			if err != nil {
+				panic(err)
+			}
+			err = cli.Publish(&client.PublishOptions{
+				QoS:       mqtt.QoS0,
+				TopicName: []byte("home/temperature/placard"),
+				Message:   []byte(watt.TempC),
+			})
+
+			if err != nil {
+				panic(err)
+			}
 		}
-		err = cli.Publish(&client.PublishOptions{
-			QoS:       mqtt.QoS0,
-			TopicName: []byte("home/temperature/placard"),
-			Message:   []byte(watt.TempC),
-		})
-
-		if err != nil {
-			panic(err)
-		}
-
 	}
 
 	err = s.Err()
